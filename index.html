@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -14,7 +14,11 @@
       --border: #2d3a4d;
       --danger: #ef4444;
     }
-    * { box-sizing: border-box; }
+
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       margin: 0;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
@@ -23,27 +27,49 @@
       min-height: 100vh;
       line-height: 1.5;
     }
+
     header {
       padding: 1rem 1.25rem;
       border-bottom: 1px solid var(--border);
       background: var(--panel);
     }
-    header h1 { margin: 0; font-size: 1.15rem; font-weight: 600; }
-    header p { margin: 0.35rem 0 0; font-size: 0.85rem; color: var(--muted); }
-    main { max-width: 960px; margin: 0 auto; padding: 1.25rem; }
+
+    header h1 {
+      margin: 0;
+      font-size: 1.15rem;
+      font-weight: 600;
+    }
+
+    header p {
+      margin: 0.35rem 0 0;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 1.25rem;
+    }
+
     .results-list {
       display: flex;
       flex-direction: column;
       gap: 1.5rem;
       margin-top: 1.25rem;
     }
+
     .result-card {
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 1rem 1.1rem;
       background: var(--panel);
     }
-    .result-card.err { border-color: var(--danger); }
+
+    .result-card.err {
+      border-color: var(--danger);
+    }
+
     .result-card-head {
       display: flex;
       align-items: flex-start;
@@ -51,12 +77,14 @@
       gap: 0.75rem;
       margin-bottom: 0.75rem;
     }
+
     .result-name {
       font-size: 0.85rem;
       color: var(--text);
       word-break: break-all;
       line-height: 1.35;
     }
+
     button.icon-btn {
       flex-shrink: 0;
       padding: 0.35rem 0.55rem;
@@ -67,23 +95,36 @@
       border: 1px solid var(--border);
       color: var(--muted);
     }
+
     button.icon-btn:hover:not(:disabled) {
       color: var(--text);
       border-color: var(--muted);
     }
+
     .card-error {
       font-size: 0.8rem;
       color: var(--danger);
       margin: 0.5rem 0 0;
     }
+
     .row {
-      display: flex; flex-wrap: wrap; gap: 1rem; align-items: center;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      align-items: center;
       margin-bottom: 1rem;
     }
-    label { font-size: 0.85rem; color: var(--muted); }
-    select, input[type="range"] {
+
+    label {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    select,
+    input[type="range"] {
       accent-color: var(--accent);
     }
+
     select {
       background: var(--bg);
       color: var(--text);
@@ -92,6 +133,7 @@
       padding: 0.45rem 0.65rem;
       font-size: 0.9rem;
     }
+
     .dropzone {
       border: 2px dashed var(--border);
       border-radius: 12px;
@@ -101,13 +143,27 @@
       transition: border-color 0.15s, background 0.15s;
       background: var(--panel);
     }
-    .dropzone:hover, .dropzone.dragover {
+
+    .dropzone:hover,
+    .dropzone.dragover {
       border-color: var(--accent);
       background: #1e2a3d;
     }
-    .dropzone p { margin: 0.35rem 0; color: var(--muted); font-size: 0.9rem; }
-    .dropzone strong { color: var(--text); }
-    .hidden { display: none !important; }
+
+    .dropzone p {
+      margin: 0.35rem 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .dropzone strong {
+      color: var(--text);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
     .progress-wrap {
       margin-top: 0.75rem;
       height: 8px;
@@ -116,27 +172,42 @@
       overflow: hidden;
       display: none;
     }
-    .progress-wrap.visible { display: block; }
+
+    .progress-wrap.visible {
+      display: block;
+    }
+
     .progress-bar {
       height: 100%;
       width: 0%;
       background: linear-gradient(90deg, var(--accent), #60a5fa);
       transition: width 0.1s;
     }
+
     .status {
       font-size: 0.85rem;
       color: var(--muted);
       min-height: 1.4em;
       margin-top: 0.75rem;
     }
-    .status.error { color: var(--danger); }
+
+    .status.error {
+      color: var(--danger);
+    }
+
     .preview {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 1rem;
       margin-top: 1.25rem;
     }
-    @media (max-width: 700px) { .preview { grid-template-columns: 1fr; } }
+
+    @media (max-width: 700px) {
+      .preview {
+        grid-template-columns: 1fr;
+      }
+    }
+
     .panel-title {
       font-size: 0.75rem;
       text-transform: uppercase;
@@ -144,6 +215,7 @@
       color: var(--muted);
       margin-bottom: 0.5rem;
     }
+
     .checker {
       border-radius: 8px;
       overflow: hidden;
@@ -157,7 +229,9 @@
       background-size: 16px 16px;
       background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
     }
-    .checker img, .checker canvas {
+
+    .checker img,
+    .checker canvas {
       display: block;
       width: 100%;
       height: auto;
@@ -165,7 +239,14 @@
       object-fit: contain;
       vertical-align: middle;
     }
-    .actions { margin-top: 1rem; display: flex; gap: 0.75rem; flex-wrap: wrap; }
+
+    .actions {
+      margin-top: 1rem;
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
     button {
       background: var(--accent);
       color: white;
@@ -176,8 +257,17 @@
       font-weight: 600;
       cursor: pointer;
     }
-    button:disabled { opacity: 0.45; cursor: not-allowed; }
-    button.secondary { background: var(--border); color: var(--text); }
+
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    button.secondary {
+      background: var(--border);
+      color: var(--text);
+    }
+
     .badge {
       display: inline-block;
       font-size: 0.72rem;
@@ -187,35 +277,42 @@
       color: #86efac;
       margin-left: 0.35rem;
     }
-    .badge.warn { background: #422006; color: #fdba74; }
-    input[type="file"] { display: none; }
+
+    .badge.warn {
+      background: #422006;
+      color: #fdba74;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
   </style>
 </head>
 <body>
   <header>
-    <h1>Quitar fondo · WebGPU / WASM</h1>
+    <h1>Remove background · WebGPU / WASM</h1>
     <p>
-      Procesamiento local en el navegador. Serví esta carpeta por HTTP (ver README).
+      Runs locally in your browser. Serve this folder over HTTP (see README).
       <span id="gpu-badge" class="badge hidden"></span>
     </p>
   </header>
   <main>
     <div class="row">
       <div>
-        <label for="model-select">Modelo</label><br />
-        <select id="model-select" title="Modelo de segmentación">
+        <label for="model-select">Model</label><br />
+        <select id="model-select" title="Segmentation model">
           <option value="briaai/RMBG-1.4">RMBG-1.4 (WASM, compatible)</option>
         </select>
       </div>
       <div>
-        <label for="mask-gamma">Preservar primer plano (mask gamma): <span id="gamma-val">0.75</span></label><br />
+        <label for="mask-gamma">Preserve foreground (mask gamma): <span id="gamma-val">0.75</span></label><br />
         <input type="range" id="mask-gamma" min="0.5" max="1" step="0.05" value="0.75" style="width: 180px" />
       </div>
     </div>
 
     <div class="dropzone" id="dropzone" tabindex="0">
-      <strong>Arrastrá una o varias imágenes aquí</strong>
-      <p>o hacé clic para elegir · JPG, PNG, WebP (podés seleccionar varias)</p>
+      <strong>Drop one or more images here</strong>
+      <p>or click to choose · JPG, PNG, WebP (multiple files allowed)</p>
       <input type="file" id="file-input" accept="image/*" multiple />
     </div>
     <div class="progress-wrap" id="progress-wrap">
@@ -226,7 +323,7 @@
     <section id="result-section" class="hidden">
       <div id="results-list" class="results-list"></div>
       <div class="actions">
-        <button type="button" class="secondary" id="btn-clear">Limpiar todo</button>
+        <button type="button" class="secondary" id="btn-clear">Clear all</button>
       </div>
     </section>
   </main>
@@ -347,7 +444,7 @@
       if (selected === WEBGPU_MODEL_ID) {
         const ok = await initializeWebGPU();
         if (ok) return true;
-        setStatus("WebGPU no disponible o falló MODNet; usando RMBG-1.4 (WASM).", false);
+        setStatus("WebGPU unavailable or MODNet failed; using RMBG-1.4 (WASM).", false);
       }
 
       env.allowLocalModels = false;
@@ -412,7 +509,7 @@
         mh = dims[0];
         mw = dims[1];
       } else {
-        throw new Error("Forma de máscara no soportada: " + JSON.stringify(dims));
+        throw new Error("Unsupported mask shape: " + JSON.stringify(dims));
       }
 
       const spatial = mh * mw;
@@ -457,7 +554,7 @@
     async function processImage(image, canvas, options = {}) {
       const { maskGamma = 1 } = options;
       if (!state.model || !state.processor) {
-        throw new Error("Modelo no inicializado.");
+        throw new Error("Model not initialized.");
       }
 
       const objectUrl = URL.createObjectURL(image);
@@ -469,13 +566,13 @@
       const raw = out.output ?? out.logits ?? out.prediction;
       let maskTensor = Array.isArray(raw) ? raw[0] : raw;
       if (!maskTensor) {
-        throw new Error("Salida del modelo inesperada (sin tensor de máscara).");
+        throw new Error("Unexpected model output (no mask tensor).");
       }
 
       await ensureMaskTensorOnCpu(maskTensor);
       const maskFlat = maskTensor.data;
       if (!maskFlat || !maskTensor.dims) {
-        throw new Error("No se pudo leer la máscara (¿WebGPU sin datos en CPU?).");
+        throw new Error("Could not read mask (WebGPU tensor not on CPU?).");
       }
 
       const maskAlphas = sampleMaskToAlpha(maskFlat, maskTensor.dims, img.width, img.height, maskGamma);
@@ -483,7 +580,7 @@
       canvas.width = img.width;
       canvas.height = img.height;
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
-      if (!ctx) throw new Error("No se pudo obtener 2d context");
+      if (!ctx) throw new Error("Could not get 2D canvas context");
       ctx.drawImage(img.toCanvas(), 0, 0);
 
       const pixelData = ctx.getImageData(0, 0, img.width, img.height);
@@ -510,8 +607,8 @@
       const btnClose = document.createElement("button");
       btnClose.type = "button";
       btnClose.className = "icon-btn";
-      btnClose.setAttribute("aria-label", "Quitar esta imagen");
-      btnClose.title = "Quitar";
+      btnClose.setAttribute("aria-label", "Remove this image");
+      btnClose.title = "Remove";
       btnClose.textContent = "✕";
 
       head.append(name, btnClose);
@@ -526,7 +623,7 @@
       tOrig.textContent = "Original";
       const tCut = document.createElement("div");
       tCut.className = "panel-title";
-      tCut.textContent = "Sin fondo (PNG)";
+      tCut.textContent = "Cutout (PNG)";
       const checkOrig = document.createElement("div");
       checkOrig.className = "checker";
       const checkCut = document.createElement("div");
@@ -548,7 +645,7 @@
       actions.className = "actions";
       const btnDl = document.createElement("button");
       btnDl.type = "button";
-      btnDl.textContent = "Descargar PNG";
+      btnDl.textContent = "Download PNG";
 
       actions.appendChild(btnDl);
 
@@ -578,7 +675,7 @@
             if (!blob) return;
             const a = document.createElement("a");
             const base = file.name.replace(/\.[^.]+$/, "");
-            a.download = base + "-sin-fondo.png";
+            a.download = base + "-no-bg.png";
             a.href = URL.createObjectURL(blob);
             a.click();
             URL.revokeObjectURL(a.href);
@@ -602,7 +699,7 @@
 
     function populateModelSelect() {
       const hasGpu = Boolean(navigator.gpu);
-      el.gpuBadge.textContent = hasGpu ? "WebGPU: disponible" : "WebGPU: no detectado";
+      el.gpuBadge.textContent = hasGpu ? "WebGPU: available" : "WebGPU: not detected";
       el.gpuBadge.className = "badge" + (hasGpu ? "" : " warn");
       el.gpuBadge.classList.remove("hidden");
 
@@ -626,7 +723,7 @@
       const wanted = el.modelSelect.value;
       if (state.model && state.processor && state.currentModelId === wanted) return;
 
-      setStatus("Cargando modelo (primera vez puede tardar y descargar ~100 MB)…");
+      setStatus("Loading model (first run may take a while and download ~100 MB)…");
       setProgress(0);
       el.progressWrap.classList.add("visible");
 
@@ -635,7 +732,7 @@
         state.processor = null;
         await initializeModel(wanted);
         setProgress(1);
-        setStatus("Modelo listo: " + state.currentModelId);
+        setStatus("Model ready: " + state.currentModelId);
       } catch (err) {
         console.error(err);
         setProgress(null);
@@ -661,7 +758,7 @@
       const n = list.length;
       for (let i = 0; i < n; i++) {
         const file = list[i];
-        setStatus(n > 1 ? `Procesando ${i + 1} / ${n}…` : "Procesando…");
+        setStatus(n > 1 ? `Processing ${i + 1} / ${n}…` : "Processing…");
 
         const ui = createResultCard(file);
         el.resultsList.appendChild(ui.card);
@@ -677,7 +774,7 @@
         }
       }
 
-      setStatus(`Listo · ${n} imagen(es) · ${state.currentModelId}`);
+      setStatus(`Done · ${n} image(s) · ${state.currentModelId}`);
     }
 
     el.maskGamma.addEventListener("input", () => {
@@ -725,14 +822,14 @@
     el.modelSelect.addEventListener("change", () => {
       state.model = null;
       state.processor = null;
-      setStatus("Modelo cambiado. Volvé a procesar la imagen.");
+      setStatus("Model changed. Process the image again.");
     });
 
     el.btnClear.addEventListener("click", () => {
       el.resultsList.querySelectorAll(".result-card img[src^='blob:']").forEach((img) => {
         try {
           URL.revokeObjectURL(img.src);
-        } catch (_) {}
+        } catch (_) { }
       });
       el.resultsList.innerHTML = "";
       el.resultSection.classList.add("hidden");
@@ -740,7 +837,7 @@
     });
 
     populateModelSelect();
-    setStatus("Elegí modelo (opcional), ajustá gamma si hace falta, y subí una o más imágenes.");
+    setStatus("Optional: pick a model, adjust gamma if needed, then add one or more images.");
   </script>
 </body>
 </html>
