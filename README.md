@@ -28,9 +28,13 @@ Then open the URL the server prints (often `http://localhost:8080`). Point the s
 
 1. Open the app in the browser as above.
 2. Optional: choose **RMBG-1.4 (WASM)** or, if WebGPU is available and you are not on iOS, **MODNet (WebGPU)**.
-3. Adjust **mask gamma** (labeled as preserving foreground): lower values tend to make edges softer; higher values keep more opaque foreground.
-4. Drag and drop images onto the drop zone, or click to select one or more files (JPG, PNG, WebP).
-5. Wait for the first-time model download if prompted; later runs use cached assets when possible.
+3. Drag and drop images onto the drop zone, or click to select one or more files (JPG, PNG, WebP). The model runs once per image; the raw mask is kept in memory for that result.
+4. Wait for the first-time model download if prompted; later runs use cached assets when possible.
+5. **Matte tuning (per image):** after each result appears, open **Matte tuning** directly under that preview. Sliders affect only that image and update the cutout **live** — no re-upload. Pipeline: **levels → contrast → gamma → feather**:
+   - **Alpha black / white level** — remaps the matte like levels in an image editor: raise black to remove leftover background haze; lower white to soften a too-hard edge.
+   - **Matte contrast** — pushes semitransparent pixels toward full transparency or full opacity (1.0 = no change).
+   - **Preserve foreground (gamma)** — curve on opacity after the above; values below 1 weaken the foreground slightly; above 1 strengthen it.
+   - **Edge feather** — softens the alpha boundary by a few pixels (box blur on the alpha channel only).
 6. Download each result as PNG from the card (files are named `*-no-bg.png`), or use **Clear all** to remove every result.
 
 ## Behavior and models

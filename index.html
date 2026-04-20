@@ -286,44 +286,111 @@
     input[type="file"] {
       display: none;
     }
+
+    details.card-matte-details {
+      margin-top: 1rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.65rem 1rem 1rem;
+      background: var(--bg);
+    }
+
+    details.card-matte-details summary {
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--text);
+      user-select: none;
+    }
+
+    details.card-matte-details summary::-webkit-details-marker {
+      color: var(--muted);
+    }
+
+    .tuning-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 0.65rem 1.25rem;
+      margin-top: 0.85rem;
+    }
+
+    .tuning-item label {
+      display: block;
+      margin-bottom: 0.25rem;
+    }
+
+    .tuning-item input[type="range"] {
+      width: 100%;
+      max-width: 280px;
+      vertical-align: middle;
+    }
+
+    .tuning-hint {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 0.35rem;
+      line-height: 1.35;
+    }
   </style>
 </head>
 <body>
   <header>
-    <h1>Remove background · WebGPU / WASM</h1>
-    <p>
+    <h1 title="Local background removal using Transformers.js; WebGPU or WASM, no server upload.">Remove background · WebGPU / WASM</h1>
+    <p title="Open this page from an http:// or https:// URL so modules and model files load correctly (not file://).">
       Runs locally in your browser. Serve this folder over HTTP (see README).
-      <span id="gpu-badge" class="badge hidden"></span>
+      <span id="gpu-badge" class="badge hidden" title="Whether this browser exposes the WebGPU API. MODNet can use it when available; otherwise the app falls back to RMBG on the CPU."></span>
     </p>
   </header>
   <main>
     <div class="row">
       <div>
-        <label for="model-select">Model</label><br />
-        <select id="model-select" title="Segmentation model">
+        <label
+          for="model-select"
+          title="Neural network that estimates foreground vs background. Changing it reloads weights on next run."
+          >Model</label
+        ><br />
+        <select id="model-select">
           <option value="briaai/RMBG-1.4">RMBG-1.4 (WASM, compatible)</option>
         </select>
       </div>
-      <div>
-        <label for="mask-gamma">Preserve foreground (mask gamma): <span id="gamma-val">0.75</span></label><br />
-        <input type="range" id="mask-gamma" min="0.5" max="1" step="0.05" value="0.75" style="width: 180px" />
-      </div>
     </div>
 
-    <div class="dropzone" id="dropzone" tabindex="0">
+    <div
+      class="dropzone"
+      id="dropzone"
+      tabindex="0"
+      title="Add images to process. Files stay in your browser; nothing is uploaded to a server. Supports drag-and-drop or click to pick files."
+    >
       <strong>Drop one or more images here</strong>
       <p>or click to choose · JPG, PNG, WebP (multiple files allowed)</p>
-      <input type="file" id="file-input" accept="image/*" multiple />
+      <input
+        type="file"
+        id="file-input"
+        accept="image/*"
+        multiple
+        title="Choose one or more images. The same formats as the drop zone."
+      />
     </div>
-    <div class="progress-wrap" id="progress-wrap">
+    <div
+      class="progress-wrap"
+      id="progress-wrap"
+      title="Progress while the AI model is downloading or loading into memory (first visit can take a while)."
+    >
       <div class="progress-bar" id="progress-bar"></div>
     </div>
-    <div class="status" id="status"></div>
+    <div class="status" id="status" title="Messages about loading, processing, and errors."></div>
 
-    <section id="result-section" class="hidden">
-      <div id="results-list" class="results-list"></div>
+    <section id="result-section" class="hidden" title="Processed images appear here with previews and per-image matte controls.">
+      <div id="results-list" class="results-list" title="Stack of results; each row is one processed image with its own controls."></div>
       <div class="actions">
-        <button type="button" class="secondary" id="btn-clear">Clear all</button>
+        <button
+          type="button"
+          class="secondary"
+          id="btn-clear"
+          title="Remove every result from the list and free preview URLs. Does not delete files on your computer."
+        >
+          Clear all
+        </button>
       </div>
     </section>
   </main>
@@ -350,8 +417,6 @@
       dropzone: document.getElementById("dropzone"),
       fileInput: document.getElementById("file-input"),
       modelSelect: document.getElementById("model-select"),
-      maskGamma: document.getElementById("mask-gamma"),
-      gammaVal: document.getElementById("gamma-val"),
       progressWrap: document.getElementById("progress-wrap"),
       progressBar: document.getElementById("progress-bar"),
       status: document.getElementById("status"),
@@ -360,6 +425,173 @@
       resultsList: document.getElementById("results-list"),
       btnClear: document.getElementById("btn-clear"),
     };
+
+    /** @type {WeakMap<Element, { maskSnapshot: { data: Float32Array, dims: number[] }, matte: Object, imgEl: HTMLImageElement, canvasEl: HTMLCanvasElement }>} */
+    const cardState = new WeakMap();
+
+    /**
+     * Matte controls placed under each result preview. Hidden until inference succeeds.
+     * @param {() => void} onMatteInput
+     */
+    function createCardMatteSection(onMatteInput) {
+      const details = document.createElement("details");
+      details.className = "card-matte-details";
+      details.open = true;
+      details.hidden = true;
+      details.title =
+        "Post-processing for this image only. Uses the cached mask from the model; sliders do not re-run inference.";
+
+      const summary = document.createElement("summary");
+      summary.textContent = "Matte tuning";
+      summary.title = "Show or hide controls that remap the model’s soft mask into transparency (levels, contrast, gamma, feather).";
+
+      const hint = document.createElement("p");
+      hint.className = "tuning-hint";
+      hint.textContent = "Adjust the cutout above live. Order: levels → contrast → gamma → feather.";
+      hint.title =
+        "Processing order: alpha black/white (levels), then matte contrast, then gamma, then edge feather on the alpha channel.";
+
+      const grid = document.createElement("div");
+      grid.className = "tuning-grid";
+
+      /**
+       * @param {string} labelText
+       * @param {number} min
+       * @param {number} max
+       * @param {number} step
+       * @param {number} def
+       * @param {string} [tooltip]
+       */
+      function addRow(labelText, min, max, step, def, tooltip) {
+        const wrap = document.createElement("div");
+        wrap.className = "tuning-item";
+        const lab = document.createElement("label");
+        const span = document.createElement("span");
+        span.className = "matte-val";
+        lab.append(labelText + " ", span);
+        const input = document.createElement("input");
+        input.type = "range";
+        input.min = String(min);
+        input.max = String(max);
+        input.step = String(step);
+        input.value = String(def);
+        if (tooltip) {
+          wrap.title = tooltip;
+          lab.title = tooltip;
+          input.title = tooltip;
+        }
+        wrap.append(lab, input);
+        grid.appendChild(wrap);
+        return { input, span };
+      }
+
+      const rowBlack = addRow(
+        "Alpha black level:",
+        0,
+        0.45,
+        0.01,
+        0,
+        "Maps the dark end of the matte (like Photoshop Levels black point). Increase to push faint background pixels toward fully transparent and reduce gray halos. Applied first among these sliders."
+      );
+      const rowWhite = addRow(
+        "Alpha white level:",
+        0.55,
+        1,
+        0.01,
+        1,
+        "Maps the bright end of the matte (white point). Decrease to keep more semi-transparent pixels at edges (softer hair or fringe). Must stay above the black level."
+      );
+      const rowContrast = addRow(
+        "Matte contrast:",
+        0.5,
+        2,
+        0.05,
+        1,
+        "Stretches alpha values away from mid-gray: above 1 = harder subject/background separation; below 1 = softer transition. 1.0 leaves contrast unchanged."
+      );
+      const rowGamma = addRow(
+        "Preserve foreground (gamma):",
+        0.35,
+        1.25,
+        0.05,
+        0.75,
+        "Power curve on opacity after levels and contrast. Below 1 slightly weakens foreground opacity; above 1 strengthens it. Does not re-run the neural network."
+      );
+      const rowFeather = addRow(
+        "Edge feather (px):",
+        0,
+        12,
+        1,
+        0,
+        "Blurs only the alpha channel by this radius (pixels) to soften jagged edges. 0 = no blur. Heavier values can make fine detail look softer."
+      );
+
+      function getMatteOptions() {
+        let black = Number(rowBlack.input.value);
+        let white = Number(rowWhite.input.value);
+        if (white <= black + 0.02) white = black + 0.02;
+        return {
+          maskGamma: Number(rowGamma.input.value),
+          alphaBlack: black,
+          alphaWhite: Math.min(1, white),
+          alphaContrast: Number(rowContrast.input.value),
+          featherPx: Number(rowFeather.input.value),
+        };
+      }
+
+      function syncLabels() {
+        rowBlack.span.textContent = Number(rowBlack.input.value).toFixed(2);
+        rowWhite.span.textContent = Number(rowWhite.input.value).toFixed(2);
+        rowContrast.span.textContent = Number(rowContrast.input.value).toFixed(2);
+        rowGamma.span.textContent = Number(rowGamma.input.value).toFixed(2);
+        rowFeather.span.textContent = String(rowFeather.input.value);
+      }
+
+      details.append(summary, hint, grid);
+
+      [rowBlack, rowWhite, rowContrast, rowGamma, rowFeather].forEach(({ input }) => {
+        input.addEventListener("input", () => {
+          syncLabels();
+          onMatteInput();
+        });
+      });
+      syncLabels();
+
+      return {
+        root: details,
+        getMatteOptions,
+        show() {
+          details.hidden = false;
+        },
+      };
+    }
+
+    /**
+     * @param {HTMLImageElement} img
+     * @returns {Promise<void>}
+     */
+    function waitForImageDecode(img) {
+      if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+      return new Promise((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error("Could not load image preview."));
+      });
+    }
+
+    /**
+     * @param {Float32Array | Uint8Array | number[]} maskFlat
+     * @returns {Float32Array}
+     */
+    function copyMaskData(maskFlat) {
+      const len = maskFlat.length;
+      const out = new Float32Array(len);
+      if (maskFlat instanceof Float32Array) {
+        out.set(maskFlat);
+      } else {
+        for (let i = 0; i < len; i++) out[i] = maskFlat[i];
+      }
+      return out;
+    }
 
     function setStatus(msg, isError = false) {
       el.status.textContent = msg || "";
@@ -488,12 +720,69 @@
     }
 
     /**
+     * Separable box blur on alpha (0–255). Uses prefix sums; window shortens at edges.
+     * @param {Uint8ClampedArray} out
+     * @param {number} w
+     * @param {number} h
+     * @param {number} r
+     */
+    function featherAlphaChannel(out, w, h, r) {
+      if (r <= 0) return;
+      const n = w * h;
+      const f = new Float32Array(n);
+      for (let i = 0; i < n; i++) f[i] = out[i];
+      const tmp = new Float32Array(n);
+      for (let y = 0; y < h; y++) {
+        const row = y * w;
+        const P = new Float64Array(w + 1);
+        for (let x = 0; x < w; x++) P[x + 1] = P[x] + f[row + x];
+        for (let x = 0; x < w; x++) {
+          const x0 = Math.max(0, x - r);
+          const x1 = Math.min(w - 1, x + r);
+          tmp[row + x] = (P[x1 + 1] - P[x0]) / (x1 - x0 + 1);
+        }
+      }
+      for (let x = 0; x < w; x++) {
+        const P = new Float64Array(h + 1);
+        for (let y = 0; y < h; y++) P[y + 1] = P[y] + tmp[y * w + x];
+        for (let y = 0; y < h; y++) {
+          const y0 = Math.max(0, y - r);
+          const y1 = Math.min(h - 1, y + r);
+          const s = (P[y1 + 1] - P[y0]) / (y1 - y0 + 1);
+          out[y * w + x] = Math.max(0, Math.min(255, Math.round(s)));
+        }
+      }
+    }
+
+    /**
+     * @typedef {Object} MattePostOptions
+     * @property {number} [maskGamma=1]
+     * @property {number} [alphaBlack=0]
+     * @property {number} [alphaWhite=1]
+     * @property {number} [alphaContrast=1]
+     * @property {number} [featherPx=0]
+     */
+
+    /**
      * @param {Float32Array | Uint8Array | number[]} maskFlat
      * @param {number[]} dims
      * @param {number} destW
      * @param {number} destH
+     * @param {MattePostOptions} post
      */
-    function sampleMaskToAlpha(maskFlat, dims, destW, destH, maskGamma) {
+    function sampleMaskToAlpha(maskFlat, dims, destW, destH, post) {
+      const {
+        maskGamma = 1,
+        alphaBlack = 0,
+        alphaWhite = 1,
+        alphaContrast = 1,
+        featherPx = 0,
+      } = post;
+
+      let lo = alphaBlack;
+      let hi = alphaWhite;
+      if (hi <= lo + 1e-6) hi = lo + 1e-6;
+
       let mh;
       let mw;
       let base = 0;
@@ -539,25 +828,28 @@
             v = 1 / (1 + Math.exp(-v));
           }
           let a = Math.max(0, Math.min(1, v));
+          a = (a - lo) / (hi - lo);
+          a = Math.max(0, Math.min(1, a));
+          if (alphaContrast !== 1) {
+            a = Math.max(0, Math.min(1, 0.5 + (a - 0.5) * alphaContrast));
+          }
           if (maskGamma !== 1 && a > 0) a = Math.pow(a, maskGamma);
           outAlphas[i * destW + j] = Math.round(a * 255);
         }
       }
+      featherAlphaChannel(outAlphas, destW, destH, featherPx);
       return outAlphas;
     }
 
     /**
-     * @param {File} image
-     * @param {HTMLCanvasElement} canvas
-     * @param {{ maskGamma?: number }} options
+     * @param {File} file
      */
-    async function processImage(image, canvas, options = {}) {
-      const { maskGamma = 1 } = options;
+    async function inferMaskOnly(file) {
       if (!state.model || !state.processor) {
         throw new Error("Model not initialized.");
       }
 
-      const objectUrl = URL.createObjectURL(image);
+      const objectUrl = URL.createObjectURL(file);
       const img = await RawImage.fromURL(objectUrl);
       URL.revokeObjectURL(objectUrl);
 
@@ -575,15 +867,33 @@
         throw new Error("Could not read mask (WebGPU tensor not on CPU?).");
       }
 
-      const maskAlphas = sampleMaskToAlpha(maskFlat, maskTensor.dims, img.width, img.height, maskGamma);
+      return {
+        maskSnapshot: {
+          data: copyMaskData(maskFlat),
+          dims: Array.from(maskTensor.dims),
+        },
+        width: img.width,
+        height: img.height,
+      };
+    }
 
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    /**
+     * @param {{ data: Float32Array, dims: number[] }} maskSnapshot
+     * @param {MattePostOptions} matte
+     * @param {HTMLImageElement} imgEl
+     * @param {HTMLCanvasElement} canvasEl
+     */
+    function paintCutout(maskSnapshot, matte, imgEl, canvasEl) {
+      const w = imgEl.naturalWidth;
+      const h = imgEl.naturalHeight;
+      if (!w || !h) return;
+      const maskAlphas = sampleMaskToAlpha(maskSnapshot.data, maskSnapshot.dims, w, h, matte);
+      canvasEl.width = w;
+      canvasEl.height = h;
+      const ctx = canvasEl.getContext("2d", { willReadFrequently: true });
       if (!ctx) throw new Error("Could not get 2D canvas context");
-      ctx.drawImage(img.toCanvas(), 0, 0);
-
-      const pixelData = ctx.getImageData(0, 0, img.width, img.height);
+      ctx.drawImage(imgEl, 0, 0);
+      const pixelData = ctx.getImageData(0, 0, w, h);
       for (let i = 0; i < maskAlphas.length; ++i) {
         pixelData.data[4 * i + 3] = maskAlphas[i];
       }
@@ -603,34 +913,42 @@
       const name = document.createElement("span");
       name.className = "result-name";
       name.textContent = file.name;
+      name.title = file.name;
 
       const btnClose = document.createElement("button");
       btnClose.type = "button";
       btnClose.className = "icon-btn";
       btnClose.setAttribute("aria-label", "Remove this image");
-      btnClose.title = "Remove";
+      btnClose.title = "Remove this result from the list. Does not delete the file on disk.";
       btnClose.textContent = "✕";
 
       head.append(name, btnClose);
 
       const preview = document.createElement("div");
       preview.className = "preview";
+      preview.title = "Side-by-side original and cutout. Resize the window to reflow on small screens.";
 
       const colOrig = document.createElement("div");
       const colCut = document.createElement("div");
       const tOrig = document.createElement("div");
       tOrig.className = "panel-title";
       tOrig.textContent = "Original";
+      tOrig.title = "Source image preview (RGB only in this panel).";
       const tCut = document.createElement("div");
       tCut.className = "panel-title";
       tCut.textContent = "Cutout (PNG)";
+      tCut.title = "Foreground with alpha; checkerboard shows transparency.";
       const checkOrig = document.createElement("div");
       checkOrig.className = "checker";
+      checkOrig.title = "Original pixels on a neutral grid (no transparency here).";
       const checkCut = document.createElement("div");
       checkCut.className = "checker";
+      checkCut.title = "Transparency preview: gray squares show where pixels are see-through.";
       const imgEl = document.createElement("img");
       imgEl.alt = "Original";
+      imgEl.title = "Full-size preview loads from your file in the browser.";
       const canvasEl = document.createElement("canvas");
+      canvasEl.title = "Cutout with alpha. Matte sliders below update this canvas without re-running the model.";
       checkOrig.appendChild(imgEl);
       checkCut.appendChild(canvasEl);
       colOrig.append(tOrig, checkOrig);
@@ -640,16 +958,34 @@
       const errP = document.createElement("p");
       errP.className = "card-error";
       errP.hidden = true;
+      errP.title = "Error message from loading or running the model on this file.";
 
       const actions = document.createElement("div");
       actions.className = "actions";
       const btnDl = document.createElement("button");
       btnDl.type = "button";
       btnDl.textContent = "Download PNG";
+      btnDl.title = "Save this cutout as a PNG with an alpha channel (transparency). Filename ends with -no-bg.png.";
 
       actions.appendChild(btnDl);
 
-      card.append(head, preview, errP, actions);
+      /** @type {{ root: HTMLDetailsElement, getMatteOptions: () => object, show: () => void }} */
+      let matteUi;
+      const applyMatteForCard = () => {
+        const st = cardState.get(card);
+        if (!st?.maskSnapshot) return;
+        const matte = matteUi.getMatteOptions();
+        st.matte = matte;
+        try {
+          paintCutout(st.maskSnapshot, matte, st.imgEl, st.canvasEl);
+        } catch (e) {
+          console.error(e);
+        }
+      };
+
+      matteUi = createCardMatteSection(applyMatteForCard);
+
+      card.append(head, preview, matteUi.root, errP, actions);
 
       /** @type {string | null} */
       let previewUrl = null;
@@ -661,7 +997,9 @@
         }
       }
 
-      btnClose.addEventListener("click", () => {
+      btnClose.addEventListener("click", (e) => {
+        e.stopPropagation();
+        cardState.delete(card);
         revokePreview();
         card.remove();
         if (!el.resultsList.children.length) {
@@ -688,7 +1026,9 @@
       return {
         card,
         canvasEl,
+        imgEl,
         errP,
+        matteUi,
         setPreviewSrc(url) {
           revokePreview();
           previewUrl = url;
@@ -704,19 +1044,24 @@
       el.gpuBadge.classList.remove("hidden");
 
       el.modelSelect.innerHTML = "";
+      el.modelSelect.title =
+        "Pick which model produces the segmentation mask. MODNet uses the GPU when available (faster). RMBG-1.4 runs via WebAssembly on the CPU and works on more devices. Changing selection reloads the model the next time you process images.";
+
       const optRmbg = document.createElement("option");
       optRmbg.value = FALLBACK_MODEL_ID;
       optRmbg.textContent = "RMBG-1.4 (WASM · compatible)";
+      optRmbg.title = "BRIA RMBG 1.4: ONNX in WebAssembly, broad compatibility, runs on CPU.";
       el.modelSelect.appendChild(optRmbg);
 
       if (hasGpu && !state.isIOS) {
         const optMod = document.createElement("option");
         optMod.value = WEBGPU_MODEL_ID;
         optMod.textContent = "MODNet (WebGPU)";
+        optMod.title = "MODNet via WebGPU: typically faster on discrete or integrated GPUs when supported.";
         el.modelSelect.appendChild(optMod);
       }
 
-      el.modelSelect.value = FALLBACK_MODEL_ID;
+      el.modelSelect.value = hasGpu && !state.isIOS ? WEBGPU_MODEL_ID : FALLBACK_MODEL_ID;
     }
 
     async function ensureModelForSelection() {
@@ -750,7 +1095,6 @@
       const list = files.filter((f) => f.type.startsWith("image/"));
       if (!list.length) return;
 
-      const gamma = Number(el.maskGamma.value);
       await ensureModelForSelection();
 
       el.resultSection.classList.remove("hidden");
@@ -765,7 +1109,20 @@
         ui.setPreviewSrc(URL.createObjectURL(file));
 
         try {
-          await processImage(file, ui.canvasEl, { maskGamma: gamma });
+          await waitForImageDecode(ui.imgEl);
+          const infer = await inferMaskOnly(file);
+          const matte = ui.matteUi.getMatteOptions();
+          if (infer.width !== ui.imgEl.naturalWidth || infer.height !== ui.imgEl.naturalHeight) {
+            console.warn("Preview dimensions differ from model input; using preview size for cutout.");
+          }
+          cardState.set(ui.card, {
+            maskSnapshot: infer.maskSnapshot,
+            matte: { ...matte },
+            imgEl: ui.imgEl,
+            canvasEl: ui.canvasEl,
+          });
+          paintCutout(infer.maskSnapshot, matte, ui.imgEl, ui.canvasEl);
+          ui.matteUi.show();
         } catch (err) {
           console.error(err);
           ui.card.classList.add("err");
@@ -776,10 +1133,6 @@
 
       setStatus(`Done · ${n} image(s) · ${state.currentModelId}`);
     }
-
-    el.maskGamma.addEventListener("input", () => {
-      el.gammaVal.textContent = Number(el.maskGamma.value).toFixed(2);
-    });
 
     el.dropzone.addEventListener("click", () => el.fileInput.click());
     el.dropzone.addEventListener("keydown", (e) => {
@@ -837,7 +1190,7 @@
     });
 
     populateModelSelect();
-    setStatus("Optional: pick a model, adjust gamma if needed, then add one or more images.");
+    setStatus("Optional: pick a model, then add images. Matte sliders appear under each result.");
   </script>
 </body>
 </html>
