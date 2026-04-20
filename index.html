@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Background removal · WebGPU (HTML)</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a2332;
+      --text: #e6edf3;
+      --muted: #8b9cb3;
+      --accent: #3b82f6;
+      --border: #2d3a4d;
+      --danger: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+    header {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+    }
+    header h1 { margin: 0; font-size: 1.15rem; font-weight: 600; }
+    header p { margin: 0.35rem 0 0; font-size: 0.85rem; color: var(--muted); }
+    main { max-width: 960px; margin: 0 auto; padding: 1.25rem; }
+    .results-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      margin-top: 1.25rem;
+    }
+    .result-card {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.1rem;
+      background: var(--panel);
+    }
+    .result-card.err { border-color: var(--danger); }
+    .result-card-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+    .result-name {
+      font-size: 0.85rem;
+      color: var(--text);
+      word-break: break-all;
+      line-height: 1.35;
+    }
+    button.icon-btn {
+      flex-shrink: 0;
+      padding: 0.35rem 0.55rem;
+      font-size: 0.85rem;
+      line-height: 1;
+      min-width: auto;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+    button.icon-btn:hover:not(:disabled) {
+      color: var(--text);
+      border-color: var(--muted);
+    }
+    .card-error {
+      font-size: 0.8rem;
+      color: var(--danger);
+      margin: 0.5rem 0 0;
+    }
+    .row {
+      display: flex; flex-wrap: wrap; gap: 1rem; align-items: center;
+      margin-bottom: 1rem;
+    }
+    label { font-size: 0.85rem; color: var(--muted); }
+    select, input[type="range"] {
+      accent-color: var(--accent);
+    }
+    select {
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.45rem 0.65rem;
+      font-size: 0.9rem;
+    }
+    .dropzone {
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      background: var(--panel);
+    }
+    .dropzone:hover, .dropzone.dragover {
+      border-color: var(--accent);
+      background: #1e2a3d;
+    }
+    .dropzone p { margin: 0.35rem 0; color: var(--muted); font-size: 0.9rem; }
+    .dropzone strong { color: var(--text); }
+    .hidden { display: none !important; }
+    .progress-wrap {
+      margin-top: 0.75rem;
+      height: 8px;
+      background: var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+      display: none;
+    }
+    .progress-wrap.visible { display: block; }
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent), #60a5fa);
+      transition: width 0.1s;
+    }
+    .status {
+      font-size: 0.85rem;
+      color: var(--muted);
+      min-height: 1.4em;
+      margin-top: 0.75rem;
+    }
+    .status.error { color: var(--danger); }
+    .preview {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-top: 1.25rem;
+    }
+    @media (max-width: 700px) { .preview { grid-template-columns: 1fr; } }
+    .panel-title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 0.5rem;
+    }
+    .checker {
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background-color: #ccc;
+      background-image:
+        linear-gradient(45deg, #bbb 25%, transparent 25%),
+        linear-gradient(-45deg, #bbb 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #bbb 75%),
+        linear-gradient(-45deg, transparent 75%, #bbb 75%);
+      background-size: 16px 16px;
+      background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+    }
+    .checker img, .checker canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+      max-height: 420px;
+      object-fit: contain;
+      vertical-align: middle;
+    }
+    .actions { margin-top: 1rem; display: flex; gap: 0.75rem; flex-wrap: wrap; }
+    button {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 0.55rem 1rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    button.secondary { background: var(--border); color: var(--text); }
+    .badge {
+      display: inline-block;
+      font-size: 0.72rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 6px;
+      background: #14532d;
+      color: #86efac;
+      margin-left: 0.35rem;
+    }
+    .badge.warn { background: #422006; color: #fdba74; }
+    input[type="file"] { display: none; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Quitar fondo · WebGPU / WASM</h1>
+    <p>
+      Procesamiento local en el navegador. Serví esta carpeta por HTTP (ver README).
+      <span id="gpu-badge" class="badge hidden"></span>
+    </p>
+  </header>
+  <main>
+    <div class="row">
+      <div>
+        <label for="model-select">Modelo</label><br />
+        <select id="model-select" title="Modelo de segmentación">
+          <option value="briaai/RMBG-1.4">RMBG-1.4 (WASM, compatible)</option>
+        </select>
+      </div>
+      <div>
+        <label for="mask-gamma">Preservar primer plano (mask gamma): <span id="gamma-val">0.75</span></label><br />
+        <input type="range" id="mask-gamma" min="0.5" max="1" step="0.05" value="0.75" style="width: 180px" />
+      </div>
+    </div>
+
+    <div class="dropzone" id="dropzone" tabindex="0">
+      <strong>Arrastrá una o varias imágenes aquí</strong>
+      <p>o hacé clic para elegir · JPG, PNG, WebP (podés seleccionar varias)</p>
+      <input type="file" id="file-input" accept="image/*" multiple />
+    </div>
+    <div class="progress-wrap" id="progress-wrap">
+      <div class="progress-bar" id="progress-bar"></div>
+    </div>
+    <div class="status" id="status"></div>
+
+    <section id="result-section" class="hidden">
+      <div id="results-list" class="results-list"></div>
+      <div class="actions">
+        <button type="button" class="secondary" id="btn-clear">Limpiar todo</button>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { env, AutoModel, AutoProcessor, RawImage } from "https://esm.sh/@huggingface/transformers@3.8.1";
+
+    const WEBGPU_MODEL_ID = "Xenova/modnet";
+    const FALLBACK_MODEL_ID = "briaai/RMBG-1.4";
+
+    const state = {
+      model: null,
+      processor: null,
+      currentModelId: FALLBACK_MODEL_ID,
+      isIOS: (() => {
+        return (
+          ["iPad Simulator", "iPhone Simulator", "iPod Simulator", "iPad", "iPhone", "iPod"].includes(navigator.platform) ||
+          (navigator.userAgent.includes("Mac") && "ontouchend" in document)
+        );
+      })(),
+    };
+
+    const el = {
+      dropzone: document.getElementById("dropzone"),
+      fileInput: document.getElementById("file-input"),
+      modelSelect: document.getElementById("model-select"),
+      maskGamma: document.getElementById("mask-gamma"),
+      gammaVal: document.getElementById("gamma-val"),
+      progressWrap: document.getElementById("progress-wrap"),
+      progressBar: document.getElementById("progress-bar"),
+      status: document.getElementById("status"),
+      gpuBadge: document.getElementById("gpu-badge"),
+      resultSection: document.getElementById("result-section"),
+      resultsList: document.getElementById("results-list"),
+      btnClear: document.getElementById("btn-clear"),
+    };
+
+    function setStatus(msg, isError = false) {
+      el.status.textContent = msg || "";
+      el.status.classList.toggle("error", isError);
+    }
+
+    function setProgress(p) {
+      if (p == null) {
+        el.progressBar.style.width = "0%";
+        el.progressWrap.classList.remove("visible");
+        return;
+      }
+      const pct = Math.round(p * 100);
+      el.progressBar.style.width = pct + "%";
+      el.progressWrap.classList.toggle("visible", p < 1);
+    }
+
+    /** @returns {Promise<boolean>} */
+    async function initializeWebGPU() {
+      const gpu = navigator.gpu;
+      if (!gpu) return false;
+      try {
+        const adapter = await gpu.requestAdapter();
+        if (!adapter) return false;
+
+        env.allowLocalModels = false;
+        if (env.backends?.onnx?.wasm) env.backends.onnx.wasm.proxy = false;
+        await new Promise((r) => setTimeout(r, 100));
+
+        state.model = await AutoModel.from_pretrained(WEBGPU_MODEL_ID, {
+          device: "webgpu",
+          config: { model_type: "modnet", architectures: ["MODNet"] },
+          progress_callback: setProgress,
+        });
+        state.processor = await AutoProcessor.from_pretrained(WEBGPU_MODEL_ID, {
+          progress_callback: setProgress,
+        });
+        state.currentModelId = WEBGPU_MODEL_ID;
+        return true;
+      } catch (e) {
+        console.error("WebGPU init failed:", e);
+        state.model = null;
+        state.processor = null;
+        return false;
+      }
+    }
+
+    /**
+     * @param {string | undefined} forceModelId
+     * @returns {Promise<boolean>}
+     */
+    async function initializeModel(forceModelId) {
+      const selected = forceModelId || el.modelSelect.value || FALLBACK_MODEL_ID;
+
+      if (state.isIOS) {
+        env.allowLocalModels = false;
+        if (env.backends?.onnx?.wasm) env.backends.onnx.wasm.proxy = true;
+
+        state.model = await AutoModel.from_pretrained(FALLBACK_MODEL_ID, {
+          config: { model_type: "custom" },
+          progress_callback: setProgress,
+        });
+        state.processor = await AutoProcessor.from_pretrained(FALLBACK_MODEL_ID, {
+          config: {
+            do_normalize: true,
+            do_pad: false,
+            do_rescale: true,
+            do_resize: true,
+            image_mean: [0.5, 0.5, 0.5],
+            feature_extractor_type: "ImageFeatureExtractor",
+            image_std: [1, 1, 1],
+            resample: 2,
+            rescale_factor: 0.00392156862745098,
+            size: { width: 1024, height: 1024 },
+          },
+          progress_callback: setProgress,
+        });
+        state.currentModelId = FALLBACK_MODEL_ID;
+        return true;
+      }
+
+      if (selected === WEBGPU_MODEL_ID) {
+        const ok = await initializeWebGPU();
+        if (ok) return true;
+        setStatus("WebGPU no disponible o falló MODNet; usando RMBG-1.4 (WASM).", false);
+      }
+
+      env.allowLocalModels = false;
+      if (env.backends?.onnx?.wasm) env.backends.onnx.wasm.proxy = true;
+
+      state.model = await AutoModel.from_pretrained(FALLBACK_MODEL_ID, {
+        progress_callback: setProgress,
+      });
+      state.processor = await AutoProcessor.from_pretrained(FALLBACK_MODEL_ID, {
+        revision: "main",
+        config: {
+          do_normalize: true,
+          do_pad: true,
+          do_rescale: true,
+          do_resize: true,
+          image_mean: [0.5, 0.5, 0.5],
+          feature_extractor_type: "ImageFeatureExtractor",
+          image_std: [0.5, 0.5, 0.5],
+          resample: 2,
+          rescale_factor: 0.00392156862745098,
+          size: { width: 1024, height: 1024 },
+        },
+        progress_callback: setProgress,
+      });
+      state.currentModelId = FALLBACK_MODEL_ID;
+      if (el.modelSelect.value === WEBGPU_MODEL_ID) {
+        el.modelSelect.value = FALLBACK_MODEL_ID;
+      }
+      return true;
+    }
+
+    /**
+     * WebGPU outputs often stay on GPU until `getData()`; reading `.data` before that throws.
+     * @param {any} tensor
+     */
+    async function ensureMaskTensorOnCpu(tensor) {
+      if (tensor && typeof tensor.getData === "function") {
+        await tensor.getData();
+      }
+      return tensor;
+    }
+
+    /**
+     * @param {Float32Array | Uint8Array | number[]} maskFlat
+     * @param {number[]} dims
+     * @param {number} destW
+     * @param {number} destH
+     */
+    function sampleMaskToAlpha(maskFlat, dims, destW, destH, maskGamma) {
+      let mh;
+      let mw;
+      let base = 0;
+      if (dims.length === 4) {
+        const c = dims[1];
+        mh = dims[2];
+        mw = dims[3];
+        if (c > 1) base = (c - 1) * mh * mw;
+      } else if (dims.length === 3) {
+        mh = dims[1];
+        mw = dims[2];
+      } else if (dims.length === 2) {
+        mh = dims[0];
+        mw = dims[1];
+      } else {
+        throw new Error("Forma de máscara no soportada: " + JSON.stringify(dims));
+      }
+
+      const spatial = mh * mw;
+      let mn = Infinity;
+      let mx = -Infinity;
+      for (let i = 0; i < spatial; i++) {
+        const v = maskFlat[base + i];
+        if (v < mn) mn = v;
+        if (v > mx) mx = v;
+      }
+      const needsMinMax = mx > 1.25 || mn < -0.25;
+
+      const outAlphas = new Uint8ClampedArray(destW * destH);
+      for (let i = 0; i < destH; i++) {
+        for (let j = 0; j < destW; j++) {
+          const sx = Math.min(mw - 1, Math.floor((j / destW) * mw));
+          const sy = Math.min(mh - 1, Math.floor((i / destH) * mh));
+          const idx = base + sy * mw + sx;
+          let v = maskFlat[idx];
+          if (needsMinMax) {
+            v = (v - mn) / (mx - mn + 1e-8);
+          } else if (v >= 0 && v <= 1) {
+            /* probability / matte */
+          } else if (v > 1 && v <= 255) {
+            v = v / 255;
+          } else {
+            v = 1 / (1 + Math.exp(-v));
+          }
+          let a = Math.max(0, Math.min(1, v));
+          if (maskGamma !== 1 && a > 0) a = Math.pow(a, maskGamma);
+          outAlphas[i * destW + j] = Math.round(a * 255);
+        }
+      }
+      return outAlphas;
+    }
+
+    /**
+     * @param {File} image
+     * @param {HTMLCanvasElement} canvas
+     * @param {{ maskGamma?: number }} options
+     */
+    async function processImage(image, canvas, options = {}) {
+      const { maskGamma = 1 } = options;
+      if (!state.model || !state.processor) {
+        throw new Error("Modelo no inicializado.");
+      }
+
+      const objectUrl = URL.createObjectURL(image);
+      const img = await RawImage.fromURL(objectUrl);
+      URL.revokeObjectURL(objectUrl);
+
+      const { pixel_values } = await state.processor(img);
+      const out = await state.model({ input: pixel_values });
+      const raw = out.output ?? out.logits ?? out.prediction;
+      let maskTensor = Array.isArray(raw) ? raw[0] : raw;
+      if (!maskTensor) {
+        throw new Error("Salida del modelo inesperada (sin tensor de máscara).");
+      }
+
+      await ensureMaskTensorOnCpu(maskTensor);
+      const maskFlat = maskTensor.data;
+      if (!maskFlat || !maskTensor.dims) {
+        throw new Error("No se pudo leer la máscara (¿WebGPU sin datos en CPU?).");
+      }
+
+      const maskAlphas = sampleMaskToAlpha(maskFlat, maskTensor.dims, img.width, img.height, maskGamma);
+
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) throw new Error("No se pudo obtener 2d context");
+      ctx.drawImage(img.toCanvas(), 0, 0);
+
+      const pixelData = ctx.getImageData(0, 0, img.width, img.height);
+      for (let i = 0; i < maskAlphas.length; ++i) {
+        pixelData.data[4 * i + 3] = maskAlphas[i];
+      }
+      ctx.putImageData(pixelData, 0, 0);
+    }
+
+    /**
+     * @param {File} file
+     */
+    function createResultCard(file) {
+      const card = document.createElement("div");
+      card.className = "result-card";
+
+      const head = document.createElement("div");
+      head.className = "result-card-head";
+
+      const name = document.createElement("span");
+      name.className = "result-name";
+      name.textContent = file.name;
+
+      const btnClose = document.createElement("button");
+      btnClose.type = "button";
+      btnClose.className = "icon-btn";
+      btnClose.setAttribute("aria-label", "Quitar esta imagen");
+      btnClose.title = "Quitar";
+      btnClose.textContent = "✕";
+
+      head.append(name, btnClose);
+
+      const preview = document.createElement("div");
+      preview.className = "preview";
+
+      const colOrig = document.createElement("div");
+      const colCut = document.createElement("div");
+      const tOrig = document.createElement("div");
+      tOrig.className = "panel-title";
+      tOrig.textContent = "Original";
+      const tCut = document.createElement("div");
+      tCut.className = "panel-title";
+      tCut.textContent = "Sin fondo (PNG)";
+      const checkOrig = document.createElement("div");
+      checkOrig.className = "checker";
+      const checkCut = document.createElement("div");
+      checkCut.className = "checker";
+      const imgEl = document.createElement("img");
+      imgEl.alt = "Original";
+      const canvasEl = document.createElement("canvas");
+      checkOrig.appendChild(imgEl);
+      checkCut.appendChild(canvasEl);
+      colOrig.append(tOrig, checkOrig);
+      colCut.append(tCut, checkCut);
+      preview.append(colOrig, colCut);
+
+      const errP = document.createElement("p");
+      errP.className = "card-error";
+      errP.hidden = true;
+
+      const actions = document.createElement("div");
+      actions.className = "actions";
+      const btnDl = document.createElement("button");
+      btnDl.type = "button";
+      btnDl.textContent = "Descargar PNG";
+
+      actions.appendChild(btnDl);
+
+      card.append(head, preview, errP, actions);
+
+      /** @type {string | null} */
+      let previewUrl = null;
+
+      function revokePreview() {
+        if (previewUrl) {
+          URL.revokeObjectURL(previewUrl);
+          previewUrl = null;
+        }
+      }
+
+      btnClose.addEventListener("click", () => {
+        revokePreview();
+        card.remove();
+        if (!el.resultsList.children.length) {
+          el.resultSection.classList.add("hidden");
+        }
+      });
+
+      btnDl.addEventListener("click", () => {
+        canvasEl.toBlob(
+          (blob) => {
+            if (!blob) return;
+            const a = document.createElement("a");
+            const base = file.name.replace(/\.[^.]+$/, "");
+            a.download = base + "-sin-fondo.png";
+            a.href = URL.createObjectURL(blob);
+            a.click();
+            URL.revokeObjectURL(a.href);
+          },
+          "image/png",
+          1
+        );
+      });
+
+      return {
+        card,
+        canvasEl,
+        errP,
+        setPreviewSrc(url) {
+          revokePreview();
+          previewUrl = url;
+          imgEl.src = url;
+        },
+      };
+    }
+
+    function populateModelSelect() {
+      const hasGpu = Boolean(navigator.gpu);
+      el.gpuBadge.textContent = hasGpu ? "WebGPU: disponible" : "WebGPU: no detectado";
+      el.gpuBadge.className = "badge" + (hasGpu ? "" : " warn");
+      el.gpuBadge.classList.remove("hidden");
+
+      el.modelSelect.innerHTML = "";
+      const optRmbg = document.createElement("option");
+      optRmbg.value = FALLBACK_MODEL_ID;
+      optRmbg.textContent = "RMBG-1.4 (WASM · compatible)";
+      el.modelSelect.appendChild(optRmbg);
+
+      if (hasGpu && !state.isIOS) {
+        const optMod = document.createElement("option");
+        optMod.value = WEBGPU_MODEL_ID;
+        optMod.textContent = "MODNet (WebGPU)";
+        el.modelSelect.appendChild(optMod);
+      }
+
+      el.modelSelect.value = FALLBACK_MODEL_ID;
+    }
+
+    async function ensureModelForSelection() {
+      const wanted = el.modelSelect.value;
+      if (state.model && state.processor && state.currentModelId === wanted) return;
+
+      setStatus("Cargando modelo (primera vez puede tardar y descargar ~100 MB)…");
+      setProgress(0);
+      el.progressWrap.classList.add("visible");
+
+      try {
+        state.model = null;
+        state.processor = null;
+        await initializeModel(wanted);
+        setProgress(1);
+        setStatus("Modelo listo: " + state.currentModelId);
+      } catch (err) {
+        console.error(err);
+        setProgress(null);
+        setStatus(err?.message || String(err), true);
+        throw err;
+      } finally {
+        setTimeout(() => setProgress(null), 400);
+      }
+    }
+
+    /**
+     * @param {File[]} files
+     */
+    async function runPipeline(files) {
+      const list = files.filter((f) => f.type.startsWith("image/"));
+      if (!list.length) return;
+
+      const gamma = Number(el.maskGamma.value);
+      await ensureModelForSelection();
+
+      el.resultSection.classList.remove("hidden");
+
+      const n = list.length;
+      for (let i = 0; i < n; i++) {
+        const file = list[i];
+        setStatus(n > 1 ? `Procesando ${i + 1} / ${n}…` : "Procesando…");
+
+        const ui = createResultCard(file);
+        el.resultsList.appendChild(ui.card);
+        ui.setPreviewSrc(URL.createObjectURL(file));
+
+        try {
+          await processImage(file, ui.canvasEl, { maskGamma: gamma });
+        } catch (err) {
+          console.error(err);
+          ui.card.classList.add("err");
+          ui.errP.textContent = err?.message || String(err);
+          ui.errP.hidden = false;
+        }
+      }
+
+      setStatus(`Listo · ${n} imagen(es) · ${state.currentModelId}`);
+    }
+
+    el.maskGamma.addEventListener("input", () => {
+      el.gammaVal.textContent = Number(el.maskGamma.value).toFixed(2);
+    });
+
+    el.dropzone.addEventListener("click", () => el.fileInput.click());
+    el.dropzone.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        el.fileInput.click();
+      }
+    });
+
+    el.fileInput.addEventListener("change", () => {
+      const files = el.fileInput.files;
+      if (files?.length) {
+        runPipeline(Array.from(files)).catch((err) => {
+          console.error(err);
+          setStatus(err?.message || String(err), true);
+        });
+      }
+      el.fileInput.value = "";
+    });
+
+    ["dragenter", "dragover", "dragleave", "drop"].forEach((ev) => {
+      el.dropzone.addEventListener(ev, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+    });
+    el.dropzone.addEventListener("dragover", () => el.dropzone.classList.add("dragover"));
+    el.dropzone.addEventListener("dragleave", () => el.dropzone.classList.remove("dragover"));
+    el.dropzone.addEventListener("drop", (e) => {
+      el.dropzone.classList.remove("dragover");
+      const dt = e.dataTransfer?.files;
+      if (dt?.length) {
+        runPipeline(Array.from(dt)).catch((err) => {
+          console.error(err);
+          setStatus(err?.message || String(err), true);
+        });
+      }
+    });
+
+    el.modelSelect.addEventListener("change", () => {
+      state.model = null;
+      state.processor = null;
+      setStatus("Modelo cambiado. Volvé a procesar la imagen.");
+    });
+
+    el.btnClear.addEventListener("click", () => {
+      el.resultsList.querySelectorAll(".result-card img[src^='blob:']").forEach((img) => {
+        try {
+          URL.revokeObjectURL(img.src);
+        } catch (_) {}
+      });
+      el.resultsList.innerHTML = "";
+      el.resultSection.classList.add("hidden");
+      setStatus("");
+    });
+
+    populateModelSelect();
+    setStatus("Elegí modelo (opcional), ajustá gamma si hace falta, y subí una o más imágenes.");
+  </script>
+</body>
+</html>
