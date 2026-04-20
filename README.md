@@ -1,3 +1,7 @@
+https://brotochola.github.io/background_remove_webgpu/
+
+
+
 # background_remove_webgpu
 
 Remove image backgrounds in the browser. No upload to a server: models run locally via WebGPU or WebAssembly (ONNX). The app is a single static page (`index.html`) with an English UI.
